@@ -1,0 +1,82 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openai/gpt-5.6-luna",
+  "watcher": {
+    "ignore": ["logs/**"]
+  },
+  "compaction": {
+    "auto": true,
+    "keep": {
+      "tokens": 10000
+    },
+    "buffer": 20000
+  },
+  "providers": {
+    "openai": {
+      "models": {
+        "gpt-5.6-luna": {}
+      }
+    },
+    "opencode": {
+      "models": {
+        "deepseek-v4.1-flash-free": {}
+      }
+    }
+  },
+  "permissions": [
+    {
+      "action": "run_slop",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "bootdev run *",
+      "effect": "allow"
+    },
+    {
+      "action": "subagent",
+      "resource": "explore",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "deny"
+    },
+    {
+      "action": "skill",
+      "resource": "create-test-program",
+      "effect": "ask"
+    }
+  ],
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp"
+      },
+      "notion": {
+        "type": "remote",
+        "url": "https://mcp.notion.com/mcp",
+        "disabled": true
+      },
+      "playwright": {
+        "type": "local",
+        "command": [
+          "bunx",
+          "--bun",
+          "@playwright/mcp@0.0.80",
+          "--isolated",
+          "--browser",
+          "chromium"
+        ]
+      }
+    }
+  }
+}

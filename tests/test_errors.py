@@ -20,12 +20,12 @@ CASES = [
         2,
         "expected ✨ after variable declaration, found 'slop'",
     ),
-    ("ship 1✨", "syntax", 1, "ship is only allowed inside a clanker"),
+    ("ship 1✨", "syntax", 1, "ship is only allowed inside a clanker, found 'ship'"),
     (
         "clanker outer() {\n    clanker inner() {\n    }\n}",
         "syntax",
         2,
-        "clanker declarations are only allowed at the top level",
+        "clanker declarations are only allowed at the top level, found 'clanker'",
     ),
     (
         "slop x✨",
@@ -40,8 +40,43 @@ CASES = [
         "expected '}' to close block, but reached end of file",
     ),
     ("hallucinate(nope)✨", "runtime", 1, "undefined variable 'nope'"),
+    ("hallucinate(1 / 0)✨", "runtime", 1, "division by zero"),
+    ("hallucinate(-1 / 0)✨", "runtime", 1, "division by zero"),
+    ("hallucinate(0 / 0)✨", "runtime", 1, "division by zero"),
+    ("slop divisor = 0✨\nhallucinate(7 / divisor)✨", "runtime", 2, "division by zero"),
     ("hallucinate(later())✨\nclanker later() {\n}", "runtime", 1, "undefined variable 'later'"),
     ("clanker f() {\n}\nf = 2✨", "runtime", 3, "cannot assign to immutable binding 'f'"),
+    (
+        "loadbearing LIMIT = 100✨\nLIMIT = 200✨",
+        "runtime",
+        2,
+        "cannot assign to loadbearing 'LIMIT'",
+    ),
+    (
+        "loadbearing LIMIT = 100✨\n{\n    LIMIT = 200✨\n}",
+        "runtime",
+        3,
+        "cannot assign to loadbearing 'LIMIT'",
+    ),
+    (
+        "slop x = 1✨\n{\n    loadbearing x = 2✨\n    { x = 3✨ }\n}",
+        "runtime",
+        4,
+        "cannot assign to loadbearing 'x'",
+    ),
+    (
+        "loadbearing LIMIT = 100✨\nclanker change() {\n    LIMIT = 200✨\n}\nchange()✨",
+        "runtime",
+        3,
+        "cannot assign to loadbearing 'LIMIT'",
+    ),
+    (
+        "clanker change() {\n    loadbearing LIMIT = 100✨\n    LIMIT = 200✨\n}\nchange()✨",
+        "runtime",
+        3,
+        "cannot assign to loadbearing 'LIMIT'",
+    ),
+    ("hallucinate = 1✨", "runtime", 1, "cannot assign to immutable binding 'hallucinate'"),
     ("slop x = 1✨\nslop x = 2✨", "runtime", 2, "'x' is already declared in this scope"),
     ("vibe 1 {\n}", "runtime", 1, "vibe condition must be a boolean, got number"),
     (
@@ -72,6 +107,21 @@ def test_error_message(source: str, kind: str, line: int, message: str):
     result = run_source(source)
     assert result.stderr == f"SlopLang {kind} error at line {line}: {message}\n"
     assert result.exit_code == 1
+
+
+@pytest.mark.parametrize("first", ["slop", "loadbearing"])
+@pytest.mark.parametrize("second", ["slop", "loadbearing"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_variables_cannot_be_redeclared_in_the_same_scope(first: str, second: str, nested: bool):
+    source = f"{first} value = 1✨\n{second} value = 2✨"
+    if nested:
+        source = "{\n" + source + "\n}"
+    result = run_source(source)
+    line = 3 if nested else 2
+    assert result.exit_code == 1
+    assert result.stderr == (
+        f"SlopLang runtime error at line {line}: 'value' is already declared in this scope\n"
+    )
 
 
 def test_output_before_error_is_kept():

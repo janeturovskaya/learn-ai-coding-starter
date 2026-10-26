@@ -33,6 +33,15 @@ def test_two_character_operators_are_greedy():
     ]
 
 
+def test_loadbearing_is_a_keyword_but_prefixes_are_identifiers():
+    assert types("loadbearing loadbearing_limit Loadbearing") == [
+        TokenType.LOADBEARING,
+        TokenType.IDENTIFIER,
+        TokenType.IDENTIFIER,
+        TokenType.EOF,
+    ]
+
+
 def test_variation_selector_after_emoji_is_absorbed():
     tokens = tokenize("✅️✨️")
     assert [t.type for t in tokens] == [TokenType.TRUE, TokenType.SPARKLES, TokenType.EOF]
@@ -45,6 +54,15 @@ def test_number_literal_is_an_int():
 
 def test_hallucinate_is_an_identifier_not_a_keyword():
     assert tokenize("hallucinate")[0].type is TokenType.IDENTIFIER
+
+
+@pytest.mark.parametrize("name", ["score2", "step_2", "_2nd", "clanker2"])
+def test_identifier_can_contain_digits_after_first_character(name: str):
+    assert tokenize(name)[0] == Token(TokenType.IDENTIFIER, name, None, 1)
+
+
+def test_identifier_cannot_start_with_a_digit():
+    assert types("2score") == [TokenType.NUMBER, TokenType.IDENTIFIER, TokenType.EOF]
 
 
 def test_string_may_contain_em_dash_and_opening_quote():
@@ -65,6 +83,7 @@ def test_string_may_contain_em_dash_and_opening_quote():
         ("“a\\", 1, "unterminated string"),
         ("a & b", 1, "unexpected character '&', did you mean '&&'?"),
         ("a | b", 1, "unexpected character '|', did you mean '||'?"),
+        ("@", 1, "unexpected character '@'"),
     ],
 )
 def test_lexical_errors(source: str, line: int, message: str):
@@ -73,3 +92,11 @@ def test_lexical_errors(source: str, line: int, message: str):
     assert info.value.line == line
     assert info.value.message == message
     assert str(info.value) == f"SlopLang lexical error at line {line}: {message}"
+
+
+def test_lexical_error_after_comment_reports_correct_line():
+    with pytest.raises(LexicalError) as info:
+        tokenize("— comment\n@")
+
+    assert info.value.line == 2
+    assert info.value.message == "unexpected character '@'"

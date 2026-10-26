@@ -8,13 +8,24 @@
       body {
         font-family: system-ui, sans-serif;
         margin: 0;
-        padding: 1.5rem;
+        padding: clamp(1rem, 2.5vw, 2rem);
         background: #f6f6f4;
         color: #222;
+      }
+      .playground {
+        max-width: 90rem;
+        margin: 0 auto;
       }
       h1 {
         font-size: 1.25rem;
         margin: 0 0 1rem;
+      }
+      .workspace {
+        display: grid;
+        gap: 1rem;
+      }
+      .workspace > section {
+        min-width: 0;
       }
       .toolbar {
         display: flex;
@@ -63,9 +74,8 @@
         resize: vertical;
       }
       pre {
-        min-width: 800px;
         min-height: 6rem;
-        margin: 0.75rem 0 0;
+        margin: 0;
         padding: 0.75rem;
         border-radius: 6px;
         background: #1e1e1e;
@@ -73,25 +83,46 @@
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
+      .output-panel h2 {
+        font-size: 0.9rem;
+        margin: 0 0 0.5rem;
+        color: #555;
+      }
       pre .err {
         color: #ff8a80;
+      }
+      @media (min-width: 900px) {
+        .workspace {
+          grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+          align-items: stretch;
+        }
+        .output-panel {
+          display: flex;
+          flex-direction: column;
+        }
+        pre {
+          flex: 1;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>SlopLang Playground</h1>
-    <div class="toolbar">
-      <button id="run">Run</button>
-      <span>Ctrl/Cmd + Enter</span>
-      <span>·</span>
-      <span>insert:</span>
-      <button class="insert" data-text="✨">✨</button>
-      <button class="insert" data-text="“”">“ ”</button>
-      <button class="insert" data-text="— ">—</button>
-      <button class="insert" data-text="✅">✅</button>
-      <button class="insert" data-text="❌">❌</button>
-    </div>
-    <textarea id="source" spellcheck="false">
+    <main class="playground">
+      <h1>SlopLang Playground</h1>
+      <div class="workspace">
+        <section class="editor-panel" aria-label="Editor">
+          <div class="toolbar">
+            <button id="run">Run</button>
+            <span>Ctrl/Cmd + Enter</span>
+            <span>·</span>
+            <span>insert:</span>
+            <button class="insert" data-text="✨">✨</button>
+            <button class="insert" data-text="“”">“ ”</button>
+            <button class="insert" data-text="— ">—</button>
+            <button class="insert" data-text="✅">✅</button>
+            <button class="insert" data-text="❌">❌</button>
+          </div>
+          <textarea id="source" aria-label="SlopLang source" spellcheck="false">
 — Comments start with an em dash. Statements end with sparkles.
 clanker describe(count) {
     vibe count > 1 {
@@ -109,7 +140,13 @@ ralph count < MAX {
     count = count + 1✨
 }
 </textarea>
-    <pre id="output">Press Run.</pre>
+        </section>
+        <section class="output-panel" aria-labelledby="output-heading">
+          <h2 id="output-heading">Output</h2>
+          <pre id="output">Press Run.</pre>
+        </section>
+      </div>
+    </main>
     <script>
       const source = document.getElementById("source");
       const output = document.getElementById("output");

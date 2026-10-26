@@ -42,6 +42,12 @@ def test_grouping_overrides_precedence():
     assert isinstance(expr.left, Grouping)
 
 
+def test_comparison_binds_tighter_than_equality():
+    expr = only_expression("1 == 2 < 3✨")
+    assert isinstance(expr, Binary) and expr.operator.type is TokenType.EQUAL_EQUAL
+    assert isinstance(expr.right, Binary) and expr.right.operator.type is TokenType.LESS
+
+
 def test_calls_chain():
     expr = only_expression("f(1)(2, 3)✨")
     assert isinstance(expr, Call) and len(expr.arguments) == 2
@@ -64,6 +70,14 @@ def test_slop_declaration():
     assert isinstance(declaration, VarDecl) and declaration.mutable
 
 
+def test_loadbearing_declaration():
+    (declaration,) = parse_source("loadbearing LIMIT = 100✨")
+    assert isinstance(declaration, VarDecl) and not declaration.mutable
+    assert declaration.name.lexeme == "LIMIT"
+    assert isinstance(declaration.initializer, Literal)
+    assert declaration.initializer.value == 100
+
+
 def test_control_flow_shapes():
     (conditional, loop) = parse_source("vibe ✅ { } nah { } ralph ❌ { }")
     assert isinstance(conditional, If) and conditional.else_branch is not None
@@ -80,12 +94,27 @@ def test_function_declaration():
 @pytest.mark.parametrize(
     ("source", "line", "message"),
     [
-        ("ship 1✨", 1, "ship is only allowed inside a clanker"),
-        ("{\n    clanker f() { }\n}", 2, "clanker declarations are only allowed at the top level"),
-        ("clanker f(a, a) { }", 1, "duplicate parameter name 'a'"),
+        ("ship 1✨", 1, "ship is only allowed inside a clanker, found 'ship'"),
+        (
+            "{\n    clanker f() { }\n}",
+            2,
+            "clanker declarations are only allowed at the top level, found 'clanker'",
+        ),
+        ("clanker f(a, a) { }", 1, "duplicate parameter name 'a', found 'a'"),
         ("clanker f() { ship✨ }", 1, "expected an expression, found '✨'"),
         ("slop x = 1", 1, "expected ✨ after variable declaration, but reached end of file"),
         ("slop x✨", 1, "expected '=' after variable name, an initializer is required, found '✨'"),
+        (
+            "loadbearing LIMIT✨",
+            1,
+            "expected '=' after variable name, an initializer is required, found '✨'",
+        ),
+        (
+            "loadbearing LIMIT = 100",
+            1,
+            "expected ✨ after variable declaration, but reached end of file",
+        ),
+        ("slop loadbearing = 1✨", 1, "expected a variable name after 'slop', found 'loadbearing'"),
         ("vibe ✅ { } nah hallucinate()✨", 1, "expected '{' after nah, found 'hallucinate'"),
         ("vibe ✅ hallucinate()✨", 1, "expected '{' after vibe condition, found 'hallucinate'"),
         ("f(1,)✨", 1, "expected an expression, found ')'"),

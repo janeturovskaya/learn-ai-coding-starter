@@ -39,7 +39,7 @@ UNSUPPORTED_CHARS: dict[str, str] = {
 
 ESCAPES: dict[str, str] = {
     "n": "\n",
-    "t": "t",
+    "t": "\t",
     "”": "”",
     "\\": "\\",
 }
@@ -75,7 +75,8 @@ class Scanner:
         if ch == "—":
             while not self.at_end() and self.peek() != "\n":
                 self.advance()
-            self.match("\n")
+            if self.match("\n"):
+                self.line += 1
             return
         if ch == "/" and self.match("/"):
             raise LexicalError(self.line, "comments start with an em dash (—), not //")
@@ -112,7 +113,7 @@ class Scanner:
             self.add_token(TokenType.OR)
             return
 
-        raise LexicalError(self.line, f"unexpected charcter '{ch}'")
+        raise LexicalError(self.line, f"unexpected character '{ch}'")
 
     def string(self) -> None:
         chars: list[str] = []
@@ -177,4 +178,4 @@ def is_identifier_start(ch: str) -> bool:
 
 
 def is_identifier_char(ch: str) -> bool:
-    return is_identifier_start(ch)
+    return is_identifier_start(ch) or is_digit(ch)

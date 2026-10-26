@@ -6,6 +6,16 @@ Files use the `.slop` extension and run with:
 uv run sloperator.py path/to/program.slop
 ```
 
+To check syntax without executing a file:
+
+```bash
+uv run sloperator.py --check path/to/program.slop
+```
+
+`--check` only tokenizes and parses the file; it does not detect runtime errors.
+Success produces no output and exits with status `0`. Lexical or syntax errors
+are written to stderr with status `1`; usage or file-read errors exit with status `2`.
+
 ## Example
 
 ```slop
@@ -34,11 +44,12 @@ Prints `small slop` twice, then `big slop`.
 | SlopLang      | Conventional | Meaning                                                 |
 | ------------- | ------------ | ------------------------------------------------------- |
 | `slop`        | `let`        | Declare a mutable variable                              |
+| `loadbearing` | `const`      | Declare an immutable variable                           |
 | `clanker`     | `fn`         | Define a function                                       |
 | `vibe`        | `if`         | Conditional                                             |
 | `nah`         | `else`       | Else branch                                             |
 | `ralph`       | `while`      | Loop while a condition is `✅`                          |
-| `hallucinate` | `print`      | Print one value, then a newline                         |
+| `hallucinate` | `print`      | Print values separated by spaces, then a newline        |
 | `ship`        | `return`     | Return one value from a function                        |
 | `✨`          | `;`          | Statement terminator (required)                         |
 | `—`           | `//`         | Start a line comment                                    |
@@ -46,7 +57,7 @@ Prints `small slop` twice, then `big slop`.
 | `✅`          | `true`       | Boolean true literal                                    |
 | `❌`          | `false`      | Boolean false literal                                   |
 
-There are no other reserved words, and no `break`, `continue`, `for`, or `else if`.
+`loadbearing` is reserved like `slop`. There are no other reserved words, and no `break`, `continue`, `for`, or `else if`.
 
 ## Source Text
 
@@ -70,16 +81,18 @@ No implicit conversions.
 
 ## Variables
 
-`slop` declares a mutable variable and requires an initializer. A scope cannot declare a name twice, but an inner block may shadow an outer name.
+`slop` declares a mutable variable; `loadbearing` declares an immutable variable. Both require an initializer. A scope cannot declare a name twice, regardless of declaration keyword, but an inner block may shadow an outer name.
 
 ```slop
 slop score = 10✨
-slop LIMIT = 100✨
+loadbearing LIMIT = 100✨
 score = score + 5✨
 score = score + 1✨
 ```
 
-Assignment is a statement, not an expression: `name = expression✨`. It updates the nearest existing `slop` variable. Reading or assigning an undefined name is a runtime error.
+Assignment is a statement, not an expression: `name = expression✨`. It resolves the nearest existing binding, updating it only if mutable. Reading or assigning an undefined name is a runtime error.
+
+Executing `LIMIT = 200✨` raises a runtime error: `cannot assign to loadbearing 'LIMIT'`. Assignments in branches or functions that never execute do not raise this error.
 
 Every brace block is a lexical scope. Assignment searches the current scope, then each enclosing scope.
 
@@ -120,15 +133,17 @@ Call depth is capped at 500 nested calls. Exceeding it is a runtime error (`stac
 
 ## Built-Ins
 
-`hallucinate(value)` is the only built-in. It accepts exactly one argument, prints it followed by a newline, and returns `nil`. Numbers print as base-10 digits, strings without quotes, booleans as `✅`/`❌`, nil as `nil`, and functions as `<clanker name>`.
+`hallucinate(...)` is the only built-in. It accepts any number of arguments (including none), prints their values separated by single spaces and ends with a newline, and returns `nil`. With no arguments it prints a blank line. Numbers print as base-10 digits, strings without quotes, booleans as `✅`/`❌`, nil as `nil`, and functions as `<clanker name>`.
 
 ```slop
 hallucinate(3)✨   — 3
+hallucinate(“score:”, 42, ✅)✨   — score: 42 ✅
+hallucinate()✨   — blank line
 ```
 
 ## Operators
 
-`+` adds numbers or concatenates strings. `-`, `*`, `/` accept only numbers; division truncates toward zero (`-7 / 2` is `-3`, not floor division's `-4`) and division by zero is a runtime error. `<`, `<=`, `>`, `>=` compare numbers. `==`, `!=` compare any values; different types are unequal, and functions are equal only to themselves. `&&` and `||` require booleans and short-circuit. Unary `-` negates a number.
+`+` adds numbers or concatenates strings. `-`, `*`, `/` accept only numbers; division truncates toward zero (`-7 / 2` is `-3`, not floor division's `-4`) and division by zero is a runtime error. `<`, `<=`, `>`, `>=` compare numbers. `==`, `!=` compare any values; different types are unequal, and functions are equal only to themselves. `&&` and `||` require booleans and short-circuit. Unary `-` negates a number. Unary `!` flips a boolean (`!✅` is `❌`, `!!✅` is `✅`); using it on a non-boolean is a runtime error.
 
 Precedence, lowest to highest:
 
@@ -138,7 +153,7 @@ Precedence, lowest to highest:
 4. `<`, `<=`, `>`, `>=`
 5. `+`, `-`
 6. `*`, `/`
-7. Unary `-`
+7. Unary `-`, `!`
 8. Calls
 9. Literals, names, `( )`
 
@@ -152,7 +167,7 @@ functionDecl   -> "clanker" IDENTIFIER "(" parameters? ")" block ;
 parameters     -> IDENTIFIER ( "," IDENTIFIER )* ;
 
 declaration    -> variableDecl | statement ;
-variableDecl   -> "slop" IDENTIFIER "=" expression "✨" ;
+variableDecl   -> ( "slop" | "loadbearing" ) IDENTIFIER "=" expression "✨" ;
 
 statement      -> assignStmt | ifStmt | loopStmt | returnStmt
                 | block | expressionStmt ;
@@ -170,7 +185,7 @@ equality       -> comparison ( ( "==" | "!=" ) comparison )* ;
 comparison     -> term ( ( "<" | "<=" | ">" | ">=" ) term )* ;
 term           -> factor ( ( "+" | "-" ) factor )* ;
 factor         -> unary ( ( "*" | "/" ) unary )* ;
-unary          -> "-" unary | call ;
+unary          -> ( "-" | "!" ) unary | call ;
 call           -> primary ( "(" arguments? ")" )* ;
 arguments      -> expression ( "," expression )* ;
 primary        -> NUMBER | STRING | "✅" | "❌"
@@ -185,6 +200,7 @@ The interpreter stops at the first lexical, syntax, or runtime error, writes the
 SlopLang lexical error at line 1: straight quotes are not supported, use “ and ” for strings
 SlopLang syntax error at line 2: expected ✨ after variable declaration, found 'slop'
 SlopLang runtime error at line 3: division by zero
+SlopLang runtime error at line 4: cannot assign to loadbearing 'LIMIT'
 ```
 
 ## Typing SlopLang
